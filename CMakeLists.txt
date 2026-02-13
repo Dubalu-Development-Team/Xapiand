@@ -435,6 +435,15 @@ endif ()
 
 
 ########################################################################
+# Dynamic Loading Library (libdl)
+########################################################################
+
+if (CMAKE_DL_LIBS)
+	target_link_libraries(${PROJECT_NAME} PRIVATE ${CMAKE_DL_LIBS})
+endif ()
+
+
+########################################################################
 # Threads Library
 ########################################################################
 
@@ -824,6 +833,7 @@ if (BUILD_TESTS)
 				${V8_LIBRARIES}
 				${M_LIBRARIES}
 				${ZLIB_LIBRARIES}
+				${CMAKE_DL_LIBS}
 			)
 			add_test(NAME "test_${VAR_TEST}" COMMAND ${PROJECT_TEST})
 			add_dependencies(check "${PROJECT_TEST}")

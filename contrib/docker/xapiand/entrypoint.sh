@@ -4,17 +4,17 @@ set -e
 
 # Setup user/group (allow the container to be started with `--user`):
 UID="${UID:-$(id -u -n)}"
-if [ "$UID" == 'root' ]; then
+if [ "$UID" = 'root' ]; then
 	UID='xapiand'
 fi
 
 GID="${GID:-$(id -g -n)}"
-if [ "$GID" == 'root' ]; then
+if [ "$GID" = 'root' ]; then
 	GID='xapiand'
 fi
 
 # if the first argument starts with '-', prepend xapiand
-if [ "${1:0:1}" = '-' ] || [ -z "$1" ]; then
+if [ "${1#-}" != "$1" ] || [ -z "$1" ]; then
 	set -- xapiand "$@"
 fi
 

@@ -16,18 +16,17 @@
 
 ################################################################################
 # Stage 1: Builder
+# Using Ubuntu 20.04 with Clang 12 (closest to Apple Clang 13, which is known
+# to compile the codebase). GCC cannot be used because the source relies on
+# Clang-specific preprocessor features (__has_builtin).
 ################################################################################
-FROM ubuntu:22.04 AS builder
+FROM ubuntu:20.04 AS builder
 
 ENV DEBIAN_FRONTEND=noninteractive
 
 # Install build dependencies
-# - clang-14: C/C++ compiler (closest Linux equivalent to Apple Clang 13)
-# - Xapian build: autoconf, automake, libtool, make
-# - Xapiand build: cmake, ninja-build
-# - Libraries: zlib1g-dev, uuid-dev
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    clang-14 \
+    clang-12 \
     git \
     ca-certificates \
     make \
@@ -43,10 +42,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     uuid-dev \
   && rm -rf /var/lib/apt/lists/*
 
-ENV CC=clang-14
-ENV CXX=clang++-14
+ENV CC=clang-12
+ENV CXX=clang++-12
 
 # Build Xapian from Kronuz fork (custom patches for Xapiand)
+# Remove -Werror from Makefiles after configure to allow building with
+# newer compilers that produce additional warnings on this older codebase.
 RUN mkdir -p /usr/src \
   && git clone -b RELEASE/1.4 --single-branch --depth 1 \
     "https://github.com/Kronuz/xapian.git" /usr/src/xapian \
@@ -58,6 +59,7 @@ RUN mkdir -p /usr/src \
     --disable-documentation \
     --enable-maintainer-mode \
     --prefix=/usr \
+  && find . -name Makefile -exec sed -i 's/-Werror//g' {} + \
   && make -j"$(nproc)" \
   && make install \
   && cp bin/xapian-inspect /usr/bin/ \
@@ -67,12 +69,15 @@ RUN mkdir -p /usr/src \
 COPY . /usr/src/Xapiand
 
 # Build Xapiand
+# Remove -Werror from build.ninja after cmake configure to allow building
+# with newer compilers that produce warnings on bundled ChaiScript headers.
 RUN mkdir -p /usr/src/Xapiand/build \
   && cd /usr/src/Xapiand/build \
   && cmake -GNinja \
     -DCMAKE_INSTALL_PREFIX:PATH=/usr \
     -DCMAKE_BUILD_TYPE=Release \
     .. \
+  && sed -i 's/-Werror//g' build.ninja \
   && ninja \
   && ninja install \
   && rm -rf /usr/src/Xapiand
@@ -81,7 +86,7 @@ RUN mkdir -p /usr/src/Xapiand/build \
 ################################################################################
 # Stage 2: Runtime
 ################################################################################
-FROM ubuntu:22.04
+FROM ubuntu:20.04
 
 LABEL maintainer="Dubalu LLC"
 
@@ -90,7 +95,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libuuid1 \
     zlib1g \
     libstdc++6 \
-    libc++1 \
   && rm -rf /var/lib/apt/lists/*
 
 # Copy installed artifacts from builder
