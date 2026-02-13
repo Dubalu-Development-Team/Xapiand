@@ -54,9 +54,24 @@ By default, the HTTP REST API is available on port **8880**.
 
 ### Docker
 
+Pre-built images are available on GitHub Container Registry:
+
 ```sh
-docker build -t dubalu/xapiand:latest contrib/docker/xapiand
-docker run -p 8880:8880 dubalu/xapiand:latest
+docker pull ghcr.io/dubalu-development-team/xapiand:stable
+docker run -p 8880:8880 ghcr.io/dubalu-development-team/xapiand:stable
+```
+
+To persist data across restarts, mount a volume:
+
+```sh
+docker run -p 8880:8880 -v xapiand-data:/var/db/xapiand ghcr.io/dubalu-development-team/xapiand:stable
+```
+
+To build the image locally instead:
+
+```sh
+docker build -f contrib/docker/xapiand/Dockerfile -t xapiand:latest .
+docker run -p 8880:8880 xapiand:latest
 ```
 
 
