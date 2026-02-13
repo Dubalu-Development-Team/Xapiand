@@ -6,74 +6,113 @@
 # /_/\_\__,_| .__/|_|\__,_|_| |_|\__,_|
 #           |_|
 #
-# Build using:
-# docker build -t dubalu/xapiand:latest contrib/docker/xapiand
-# docker tag dubalu/xapiand:latest dubalu/xapiand:$(docker run --rm dubalu/xapiand:latest --version)
-# docker push dubalu/xapiand
+# Build from the project root:
+#   docker build -f contrib/docker/xapiand/Dockerfile -t dubalu/xapiand:latest .
+#   docker tag dubalu/xapiand:latest dubalu/xapiand:$(docker run --rm dubalu/xapiand:latest --version)
+#
+# Run:
+#   docker run -d -p 8880:8880 dubalu/xapiand:latest
+#
 
-FROM dubalu/clang as builder
+################################################################################
+# Stage 1: Builder
+################################################################################
+FROM ubuntu:22.04 AS builder
 
-RUN apk add libuuid \
-  && apk add --no-cache --virtual .build-deps \
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Install build dependencies
+# - clang-14: C/C++ compiler (closest Linux equivalent to Apple Clang 13)
+# - Xapian build: autoconf, automake, libtool, make
+# - Xapiand build: cmake, ninja-build
+# - Libraries: zlib1g-dev, uuid-dev
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    clang-14 \
     git \
-    zlib-dev \
-    # Xapian specific:
+    ca-certificates \
     make \
     autoconf \
     automake \
     libtool \
     perl \
     tcl \
-    # Xapiand specific:
-    ninja \
     cmake \
-    util-linux-dev
+    ninja-build \
+    pkg-config \
+    zlib1g-dev \
+    uuid-dev \
+  && rm -rf /var/lib/apt/lists/*
 
-# Build xapian using clang (from Kronuz git repo using layer cache buster)
-ADD https://api.github.com/repos/Kronuz/xapian/git/refs/heads/RELEASE/1.4 xapian-version.json
+ENV CC=clang-14
+ENV CXX=clang++-14
+
+# Build Xapian from Kronuz fork (custom patches for Xapiand)
 RUN mkdir -p /usr/src \
-  && git clone -b RELEASE/1.4 --single-branch --depth 1 "https://github.com/Kronuz/xapian.git" /usr/src/xapian \
+  && git clone -b RELEASE/1.4 --single-branch --depth 1 \
+    "https://github.com/Kronuz/xapian.git" /usr/src/xapian \
   && cd /usr/src/xapian/xapian-core \
   && ./preautoreconf \
   && autoreconf --force --install -Im4 \
-  && CC=clang CXX=clang++ ./configure \
+  && ./configure \
     --disable-dependency-tracking \
     --disable-documentation \
     --enable-maintainer-mode \
     --prefix=/usr \
+  && make -j"$(nproc)" \
   && make install \
-  && cp bin/xapian-inspect /usr/bin \
+  && cp bin/xapian-inspect /usr/bin/ \
   && rm -rf /usr/src/xapian
 
-# Build Xapiand using clang (from Kronuz git repo using layer cache buster)
-ADD https://api.github.com/repos/Kronuz/Xapiand/git/refs/heads/master xapiand-version.json
-RUN CONFIG="\
-    -DCMAKE_INSTALL_PREFIX:PATH=/usr \
-  " \
-  && mkdir -p /usr/src \
-  && git clone -b stable "https://github.com/Kronuz/Xapiand" /usr/src/Xapiand \
-  && mkdir /usr/src/Xapiand/build \
+# Copy Xapiand source (uses local source instead of git clone)
+COPY . /usr/src/Xapiand
+
+# Build Xapiand
+RUN mkdir -p /usr/src/Xapiand/build \
   && cd /usr/src/Xapiand/build \
-  && cmake -GNinja $CONFIG .. \
+  && cmake -GNinja \
+    -DCMAKE_INSTALL_PREFIX:PATH=/usr \
+    -DCMAKE_BUILD_TYPE=Release \
+    .. \
+  && ninja \
   && ninja install \
   && rm -rf /usr/src/Xapiand
 
-RUN apk del .build-deps \
-  && apk del build-clang
 
-# Xapiand image
-FROM alpine:3.8
+################################################################################
+# Stage 2: Runtime
+################################################################################
+FROM ubuntu:22.04
 
-MAINTAINER Kronuz
+LABEL maintainer="Dubalu LLC"
 
-COPY --from=builder /usr /usr
-COPY ./entrypoint.sh /
+# Install only runtime dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libuuid1 \
+    zlib1g \
+    libstdc++6 \
+    libc++1 \
+  && rm -rf /var/lib/apt/lists/*
 
-RUN apk add libuuid \
-  && mkdir -p /var/db \
-  && addgroup -S xapiand \
-  && adduser -D -S -h /var/db/xapiand -s /sbin/nologin -G xapiand xapiand \
-  && chmod +x /entrypoint.sh
+# Copy installed artifacts from builder
+COPY --from=builder /usr/bin/xapiand /usr/bin/xapiand
+COPY --from=builder /usr/bin/xapian-inspect /usr/bin/xapian-inspect
+COPY --from=builder /usr/lib/libxapian.so* /usr/lib/
+COPY --from=builder /usr/share/xapiand/ /usr/share/xapiand/
+
+# Refresh shared library cache
+RUN ldconfig
+
+# Create xapiand user and data directory
+RUN mkdir -p /var/db \
+  && addgroup --system xapiand \
+  && adduser --disabled-password --system \
+    --home /var/db/xapiand \
+    --shell /sbin/nologin \
+    --ingroup xapiand \
+    xapiand
+
+COPY contrib/docker/xapiand/entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
 
 EXPOSE 8880
 
