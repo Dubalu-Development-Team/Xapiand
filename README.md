@@ -61,11 +61,27 @@ docker pull ghcr.io/dubalu-development-team/xapiand:stable
 docker run -p 8880:8880 ghcr.io/dubalu-development-team/xapiand:stable
 ```
 
-To persist data across restarts, mount a volume:
+To persist data across restarts, mount a host directory or a named volume:
 
 ```sh
+# Using a host directory:
+docker run -p 8880:8880 -v /path/to/data:/var/db/xapiand ghcr.io/dubalu-development-team/xapiand:stable
+
+# Using a named volume:
 docker run -p 8880:8880 -v xapiand-data:/var/db/xapiand ghcr.io/dubalu-development-team/xapiand:stable
 ```
+
+To use a custom database path inside the container, set the `XAPIAND_DATABASE`
+environment variable:
+
+```sh
+docker run -p 8880:8880 -e XAPIAND_DATABASE=/data -v /path/to/data:/data ghcr.io/dubalu-development-team/xapiand:stable
+```
+
+| Variable | Default | Description |
+|---|---|---|
+| `XAPIAND_DATABASE` | `/var/db/xapiand` | Database directory inside the container |
+| `XAPIAND_CLUSTER` | Container hostname | Cluster name to join |
 
 To build the image locally instead:
 

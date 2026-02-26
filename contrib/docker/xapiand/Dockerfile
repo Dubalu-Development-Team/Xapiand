@@ -13,6 +13,16 @@
 # Run:
 #   docker run -d -p 8880:8880 dubalu/xapiand:latest
 #
+# Run with a persistent data volume:
+#   docker run -d -p 8880:8880 -v /path/to/data:/var/db/xapiand dubalu/xapiand:latest
+#
+# Run with a custom database path:
+#   docker run -d -p 8880:8880 -e XAPIAND_DATABASE=/data -v /path/to/data:/data dubalu/xapiand:latest
+#
+# Environment variables:
+#   XAPIAND_DATABASE  — Database directory inside the container (default: /var/db/xapiand)
+#   XAPIAND_CLUSTER   — Cluster name (default: container hostname)
+#
 
 ################################################################################
 # Stage 1: Builder
