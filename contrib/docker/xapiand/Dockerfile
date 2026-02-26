@@ -121,4 +121,4 @@ RUN chmod +x /entrypoint.sh
 EXPOSE 8880
 
 ENTRYPOINT ["/entrypoint.sh"]
-CMD ["--log=thread-names", "--uuid=partition", "--strict", "--echo", "--no-comments", "--verbosity=4", "--http-clients=100"]
+CMD ["-v"]

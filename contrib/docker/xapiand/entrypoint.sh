@@ -30,6 +30,9 @@ if [ "$1" = 'xapiand' ]; then
 	fi
 
 	set -- "$@" \
+		--strict \
+		--foreign \
+		--uuid=encoded \
 		--uid="$UID" \
 		--gid="$GID" \
 		--cluster="$XAPIAND_CLUSTER" \
