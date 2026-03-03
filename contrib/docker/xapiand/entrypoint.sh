@@ -31,8 +31,10 @@ if [ "$1" = 'xapiand' ]; then
 
 	set -- "$@" \
 		--strict \
+		--optimal \
 		--foreign \
 		--uuid=encoded \
+		--verbosity=3 \
 		--uid="$UID" \
 		--gid="$GID" \
 		--cluster="$XAPIAND_CLUSTER" \
